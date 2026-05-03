@@ -1,0 +1,35 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local data and generated PoC output
+data/
+poc/output/
+
+# Local editor / OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local agent scratch files
+.codex
+.codex/
