@@ -16,6 +16,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import subprocess
@@ -193,6 +194,14 @@ def save_named_transcript(result: dict, output_path: Path) -> None:
     output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def transcribe_part_task(audio_path: Path, transcript_path: Path, api_key: str) -> Path:
+    print(f"Diarizing: {audio_path}", flush=True)
+    result = transcribe_file(file_path=audio_path, api_key=api_key)
+    save_named_transcript(result=result, output_path=transcript_path)
+    print(f"Saved diarized transcript to: {transcript_path}", flush=True)
+    return transcript_path
+
+
 def run_diarize_phase(output_dir: Path, reuse: bool) -> tuple[list[Path], str]:
     transcript_paths = [
         part_diarized_path(output_dir, index, DEFAULT_PART_COUNT)
@@ -208,15 +217,27 @@ def run_diarize_phase(output_dir: Path, reuse: bool) -> tuple[list[Path], str]:
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set. Add it to .env or the environment.")
 
-    print("Running diarize phase for all parts.", flush=True)
-    for index, transcript_path in enumerate(transcript_paths, start=1):
-        audio_path = part_audio_path(output_dir, index, DEFAULT_PART_COUNT)
-        print(f"Diarizing: {audio_path}", flush=True)
-        result = transcribe_file(file_path=audio_path, api_key=api_key)
-        save_named_transcript(result=result, output_path=transcript_path)
-        print(f"Saved diarized transcript to: {transcript_path}", flush=True)
+    print(f"Running diarize phase for all parts in parallel ({DEFAULT_PART_COUNT} workers).", flush=True)
+    futures: dict[concurrent.futures.Future[Path], tuple[int, Path]] = {}
+    completed_paths: dict[int, Path] = {}
 
-    return transcript_paths, "executed"
+    with concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_PART_COUNT) as executor:
+        for index, transcript_path in enumerate(transcript_paths, start=1):
+            audio_path = part_audio_path(output_dir, index, DEFAULT_PART_COUNT)
+            future = executor.submit(transcribe_part_task, audio_path, transcript_path, api_key)
+            futures[future] = (index, transcript_path)
+
+        try:
+            for future in concurrent.futures.as_completed(futures):
+                index, transcript_path = futures[future]
+                completed_paths[index] = future.result()
+                print(f"Completed diarize part {index}/{DEFAULT_PART_COUNT}: {transcript_path.name}", flush=True)
+        except Exception:
+            for pending in futures:
+                pending.cancel()
+            raise
+
+    return [completed_paths[index] for index in range(1, DEFAULT_PART_COUNT + 1)], "executed"
 
 
 def run_merge_command(
