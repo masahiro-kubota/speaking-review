@@ -10,7 +10,9 @@
 
 `poc/merge_transcripts.py` は、重なりありで分割した transcript JSON 2本を受け取り、前半 transcript の末尾 sentence 群を anchor にして後半 transcript の重複 prefix を探し、重複部分と結合結果を JSON で出力する簡易スクリプトです。
 
-`poc/ui` には、diarized transcript を見ながら segment 区間を再生して確認するための最小 UI があります。
+`poc/ui_segments` には、diarized transcript を見ながら segment 区間を再生して確認するための最小 UI があります。
+
+`poc/ui_student_turns` には、`student_turns.json` を見ながら生徒発話の turn 単位で prompt と返答を確認するための最小 UI があります。
 
 ## 使い方
 
@@ -47,10 +49,18 @@ uv run python poc/extract_student_turns.py \
 
 出力先はデフォルトで `poc/output/*.student_turns.json` です。
 
-## Transcript Review UI
+## Segment Review UI
 
 ```bash
-uv run uvicorn app:app --app-dir poc/ui --reload
+uv run uvicorn app:app --app-dir poc/ui_segments --reload
+```
+
+ブラウザで `http://127.0.0.1:8000` を開きます。
+
+## Student Turn Review UI
+
+```bash
+uv run uvicorn app:app --app-dir poc/ui_student_turns --reload
 ```
 
 ブラウザで `http://127.0.0.1:8000` を開きます。

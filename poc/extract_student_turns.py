@@ -234,6 +234,7 @@ def main() -> int:
     output_path = (args.output.expanduser().resolve() if args.output else default_output_path(transcript_path))
 
     transcript = load_transcript(transcript_path)
+    source_file = Path(str(transcript.get("source_file", "")))
     speaker_roles, student_speakers, teacher_speakers = load_speaker_roles(speaker_roles_path)
     segments = flatten_segments(transcript)
     role_turns = merge_role_turns(segments, speaker_roles, args.merge_gap_seconds)
@@ -242,6 +243,8 @@ def main() -> int:
     result = {
         "transcript_file": str(transcript_path),
         "speaker_roles_file": str(speaker_roles_path),
+        "source_file": str(source_file),
+        "source_file_name": source_file.name,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "merge_gap_seconds": args.merge_gap_seconds,
         "student_speakers": student_speakers,

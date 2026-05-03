@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Turn Review UI</title>
+    <link rel="stylesheet" href="/student-turn-static/styles.css?v=1" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">PoC UI</p>
+          <h1>Student Turn Review</h1>
+          <p class="hero-copy">
+            生徒の発話を turn 単位で見ながら、直前の prompt と返答をまとめて確認するための最小 UI。
+          </p>
+        </div>
+        <div class="picker">
+          <label for="turns-select">Student Turns</label>
+          <div class="picker-row">
+            <select id="turns-select"></select>
+            <button id="load-button" type="button">Load</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="meta">
+        <div class="meta-card">
+          <span class="meta-label">Audio</span>
+          <strong id="audio-file-name">-</strong>
+        </div>
+        <div class="meta-card">
+          <span class="meta-label">Turns</span>
+          <strong id="turn-count">0</strong>
+        </div>
+        <div class="meta-card">
+          <span class="meta-label">Student Labels</span>
+          <strong id="student-speakers">-</strong>
+        </div>
+        <div class="meta-card">
+          <span class="meta-label">Teacher Labels</span>
+          <strong id="teacher-speakers">-</strong>
+        </div>
+      </section>
+
+      <section class="player-panel">
+        <audio id="audio-player" controls preload="metadata"></audio>
+      </section>
+
+      <section id="turn-list" class="turn-list">
+        <article class="empty-card">Student turns を選んでください。</article>
+      </section>
+    </main>
+
+    <script src="/student-turn-static/app.js?v=1" defer></script>
+  </body>
+</html>
