@@ -1,8 +1,8 @@
-# Student Turn Review UI
+# Student Speech Review UI
 
-`student_turns.json` と `student_utterances.json` を見ながら、先生の prompt と生徒の返答を turn / utterance 単位で確認するための最小 UI です。
+`poc/output/<lesson>/merged.student_turns.json` と `merged.student_utterances.json` を見ながら、先生の prompt と生徒の返答を turn / utterance 単位で確認するための最小 UI です。
 
-対応する `student_turn_reviews.json` があれば、各 turn の添削結果も表示します。
+添削結果は utterance 単位のみを表示します。対応する `merged.student_utterance_reviews.json` があれば、各 utterance の添削結果も表示します。
 
 ## 起動
 
@@ -14,7 +14,7 @@ uv run uvicorn app:app --app-dir poc/ui_student_turns --reload
 
 ## 前提
 
-- `poc/output/*.student_turns.json` または `poc/output/*.student_utterances.json` があること
+- `poc/output/<lesson>/merged.student_turns.json` または `merged.student_utterances.json` があること
 - それらの JSON から音声ファイルに辿れること
 
 ## できること
@@ -23,4 +23,4 @@ uv run uvicorn app:app --app-dir poc/ui_student_turns --reload
 - turn / utterance ごとの prompt / student text の確認
 - `Play Student` で生徒側の区間再生
 - `Play Prompt + Student` で直前 prompt を含めた区間再生
-- `student_turn_reviews.json` があれば corrected / natural / feedback / issues の表示
+- `merged.student_utterance_reviews.json` があれば corrected / natural / feedback / issues の表示

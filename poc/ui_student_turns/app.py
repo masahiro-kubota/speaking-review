@@ -11,13 +11,12 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = ROOT_DIR / "poc" / "output"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-STUDENT_TURNS_SUFFIX = ".student_turns.json"
-STUDENT_UTTERANCES_SUFFIX = ".student_utterances.json"
-STUDENT_TURN_REVIEWS_SUFFIX = ".student_turn_reviews.json"
-STUDENT_UTTERANCE_REVIEWS_SUFFIX = ".student_utterance_reviews.json"
+STUDENT_TURNS_FILE_NAME = "merged.student_turns.json"
+STUDENT_UTTERANCES_FILE_NAME = "merged.student_utterances.json"
+STUDENT_UTTERANCE_REVIEWS_FILE_NAME = "merged.student_utterance_reviews.json"
 
 
-app = FastAPI(title="Student Turn Review UI")
+app = FastAPI(title="Student Speech Review UI")
 app.mount("/student-turn-static", StaticFiles(directory=STATIC_DIR), name="student-turn-static")
 
 
@@ -27,47 +26,76 @@ def normalize_unit(unit: str) -> str:
     return unit
 
 
-def available_paths(unit: str) -> list[Path]:
+def payload_file_name(unit: str) -> str:
+    unit = normalize_unit(unit)
+    return STUDENT_TURNS_FILE_NAME if unit == "turn" else STUDENT_UTTERANCES_FILE_NAME
+
+
+def review_file_name(unit: str) -> str | None:
+    unit = normalize_unit(unit)
+    return None if unit == "turn" else STUDENT_UTTERANCE_REVIEWS_FILE_NAME
+
+
+def available_lesson_dirs(unit: str) -> list[Path]:
     unit = normalize_unit(unit)
     if not OUTPUT_DIR.exists():
         return []
-    suffix = STUDENT_TURNS_SUFFIX if unit == "turn" else STUDENT_UTTERANCES_SUFFIX
+    target_file_name = payload_file_name(unit)
     return sorted(
-        OUTPUT_DIR.glob(f"*{suffix}"),
-        key=lambda path: path.stat().st_mtime,
+        [
+            path
+            for path in OUTPUT_DIR.iterdir()
+            if path.is_dir() and (path / target_file_name).is_file()
+        ],
+        key=lambda path: (path / target_file_name).stat().st_mtime,
         reverse=True,
     )
 
 
-def payload_path_from_name(name: str, unit: str) -> Path:
+def lesson_dir_from_name(name: str, unit: str) -> Path:
     unit = normalize_unit(unit)
     path = (OUTPUT_DIR / name).resolve()
     if path.parent != OUTPUT_DIR.resolve():
-        raise HTTPException(status_code=400, detail="Invalid student-speech path.")
-    suffix = STUDENT_TURNS_SUFFIX if unit == "turn" else STUDENT_UTTERANCES_SUFFIX
-    if not path.is_file() or not path.name.endswith(suffix):
+        raise HTTPException(status_code=400, detail="Invalid lesson path.")
+    if not path.is_dir():
+        raise HTTPException(status_code=404, detail="Lesson directory not found.")
+    if not (path / payload_file_name(unit)).is_file():
         raise HTTPException(status_code=404, detail="Student-speech file not found.")
     return path
+
+
+def payload_path_for_lesson(lesson_dir: Path, unit: str) -> Path:
+    payload_path = lesson_dir / payload_file_name(unit)
+    if not payload_path.is_file():
+        raise HTTPException(status_code=404, detail="Student-speech file not found.")
+    return payload_path
 
 
 def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def review_path_for_payload(payload_path: Path, unit: str) -> Path:
-    unit = normalize_unit(unit)
-    if unit == "turn":
-        return payload_path.with_name(
-            payload_path.name.removesuffix(STUDENT_TURNS_SUFFIX) + STUDENT_TURN_REVIEWS_SUFFIX
-        )
-    return payload_path.with_name(
-        payload_path.name.removesuffix(STUDENT_UTTERANCES_SUFFIX) + STUDENT_UTTERANCE_REVIEWS_SUFFIX
-    )
+def review_path_for_lesson(lesson_dir: Path, unit: str) -> Path:
+    review_name = review_file_name(unit)
+    if review_name is None:
+        raise HTTPException(status_code=404, detail="Review file is not supported for this unit.")
+    return lesson_dir / review_name
 
 
-def load_reviews(payload_path: Path, unit: str) -> tuple[dict[str, dict], dict]:
+def load_reviews(lesson_dir: Path, unit: str) -> tuple[dict[str, dict], dict]:
     unit = normalize_unit(unit)
-    review_path = review_path_for_payload(payload_path, unit)
+    review_name = review_file_name(unit)
+    if review_name is None:
+        return {}, {
+            "available": False,
+            "review_file_name": None,
+            "reviewed_count": 0,
+            "skipped_count": 0,
+            "error_count": 0,
+            "processed_count": 0,
+        }
+
+    review_path = lesson_dir / review_name
     if not review_path.exists():
         return {}, {
             "available": False,
@@ -75,7 +103,7 @@ def load_reviews(payload_path: Path, unit: str) -> tuple[dict[str, dict], dict]:
             "reviewed_count": 0,
             "skipped_count": 0,
             "error_count": 0,
-            "processed_turn_count": 0,
+            "processed_count": 0,
         }
 
     payload = load_json(review_path)
@@ -87,7 +115,7 @@ def load_reviews(payload_path: Path, unit: str) -> tuple[dict[str, dict], dict]:
             "reviewed_count": 0,
             "skipped_count": 0,
             "error_count": 0,
-            "processed_turn_count": 0,
+            "processed_count": 0,
         }
 
     review_map: dict[str, dict] = {}
@@ -103,7 +131,13 @@ def load_reviews(payload_path: Path, unit: str) -> tuple[dict[str, dict], dict]:
         "reviewed_count": int(payload.get("reviewed_count", 0) or 0),
         "skipped_count": int(payload.get("skipped_count", 0) or 0),
         "error_count": int(payload.get("error_count", 0) or 0),
-        "processed_turn_count": int(payload.get("processed_turn_count", len(review_map)) or 0),
+        "processed_count": int(
+            payload.get(
+                "processed_utterance_count",
+                payload.get("processed_turn_count", len(review_map)),
+            )
+            or 0
+        ),
     }
 
 
@@ -173,18 +207,20 @@ def normalize_items(payload: dict, review_map: dict[str, dict], unit: str) -> li
     return items
 
 
-def build_payload(payload_path: Path, unit: str) -> dict:
+def build_payload(lesson_dir: Path, unit: str) -> dict:
     unit = normalize_unit(unit)
+    payload_path = payload_path_for_lesson(lesson_dir, unit)
     payload = load_json(payload_path)
     audio_path = resolve_audio_source(payload)
-    review_map, review_summary = load_reviews(payload_path, unit)
+    review_map, review_summary = load_reviews(lesson_dir, unit)
     items = normalize_items(payload, review_map, unit)
     item_label = "turn" if unit == "turn" else "utterance"
     count_key = "turn_count" if unit == "turn" else "utterance_count"
     return {
-        "name": payload_path.name,
+        "name": lesson_dir.name,
         "unit_type": unit,
         "unit_label": item_label,
+        "payload_file_name": payload_path.name,
         "source_file": str(audio_path),
         "source_file_name": audio_path.name,
         "merge_gap_seconds": payload.get("merge_gap_seconds"),
@@ -198,9 +234,9 @@ def build_payload(payload_path: Path, unit: str) -> dict:
     }
 
 
-def build_summary(payload_path: Path, unit: str) -> dict:
+def build_summary(lesson_dir: Path, unit: str) -> dict:
     unit = normalize_unit(unit)
-    payload = build_payload(payload_path, unit)
+    payload = build_payload(lesson_dir, unit)
     return {
         "name": payload["name"],
         "unit_type": unit,
@@ -215,18 +251,18 @@ def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
-@app.get("/api/student-speech-files")
-def list_student_speech_files(unit: str = "turn") -> dict:
-    return {"items": [build_summary(path, unit) for path in available_paths(unit)]}
+@app.get("/api/lessons")
+def list_lessons(unit: str = "turn") -> dict:
+    return {"items": [build_summary(path, unit) for path in available_lesson_dirs(unit)]}
 
 
 @app.get("/api/student-speech")
-def get_student_speech(name: str, unit: str = "turn") -> dict:
-    return build_payload(payload_path_from_name(name, unit), unit)
+def get_student_speech(lesson: str, unit: str = "turn") -> dict:
+    return build_payload(lesson_dir_from_name(lesson, unit), unit)
 
 
 @app.get("/api/audio")
-def get_audio(name: str, unit: str = "turn") -> FileResponse:
-    payload_path = payload_path_from_name(name, unit)
+def get_audio(lesson: str, unit: str = "turn") -> FileResponse:
+    payload_path = payload_path_for_lesson(lesson_dir_from_name(lesson, unit), unit)
     payload = load_json(payload_path)
     return FileResponse(resolve_audio_source(payload))

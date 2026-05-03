@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Turn Review UI</title>
-    <link rel="stylesheet" href="/student-turn-static/styles.css?v=4" />
+    <title>Student Speech Review UI</title>
+    <link rel="stylesheet" href="/student-turn-static/styles.css?v=6" />
   </head>
   <body>
     <main class="page">
       <section class="hero">
         <div>
           <p class="eyebrow">PoC UI</p>
-          <h1>Student Turn Review</h1>
+          <h1>Student Speech Review</h1>
           <p class="hero-copy">
-            生徒の発話を turn 単位で見ながら、直前の prompt と返答をまとめて確認するための最小 UI。
+            `poc/output/&lt;lesson&gt;/merged.student_turns.json` と `merged.student_utterances.json` を見ながら、utterance 単位の添削結果を確認するための最小 UI。
           </p>
         </div>
         <div class="picker">
@@ -24,9 +24,9 @@
               <option value="utterance">Utterance</option>
             </select>
           </div>
-          <label for="turns-select">Student Speech</label>
+          <label for="lesson-select">Lesson</label>
           <div class="picker-row">
-            <select id="turns-select"></select>
+            <select id="lesson-select"></select>
             <button id="load-button" type="button">Load</button>
           </div>
         </div>
@@ -60,10 +60,10 @@
       </section>
 
       <section id="turn-list" class="turn-list">
-        <article class="empty-card">Student turns を選んでください。</article>
+        <article class="empty-card">Lesson を選んでください。</article>
       </section>
     </main>
 
-    <script src="/student-turn-static/app.js?v=4" defer></script>
+    <script src="/student-turn-static/app.js?v=6" defer></script>
   </body>
 </html>

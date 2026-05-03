@@ -1,5 +1,5 @@
 const unitSelect = document.getElementById("unit-select");
-const turnsSelect = document.getElementById("turns-select");
+const lessonSelect = document.getElementById("lesson-select");
 const loadButton = document.getElementById("load-button");
 const audioPlayer = document.getElementById("audio-player");
 const audioFileName = document.getElementById("audio-file-name");
@@ -57,6 +57,10 @@ function updateSummary() {
   itemCount.textContent = String(speechData.item_count || 0);
   studentSpeakers.textContent = formatSpeakerList(speechData.student_speakers);
   teacherSpeakers.textContent = formatSpeakerList(speechData.teacher_speakers);
+  if (speechData.unit_type === "turn") {
+    reviewSummary.textContent = "Utterance review only";
+    return;
+  }
   const summary = speechData.review_summary || {};
   if (!summary.available) {
     reviewSummary.textContent = "No review file";
@@ -70,6 +74,18 @@ function escapeIssueCategory(value) {
 }
 
 function renderReviewSection(item) {
+  if (item.unit_type === "turn") {
+    return `
+      <section class="review-block review-pending">
+        <div class="review-header">
+          <p class="section-label">Review</p>
+          <span class="status-badge status-pending">Utterance Only</span>
+        </div>
+        <p class="section-text">添削は utterance 単位のみです。Utterance に切り替えて確認してください。</p>
+      </section>
+    `;
+  }
+
   const status = item.review_status || "not_reviewed";
   if (status === "not_reviewed") {
     return `
@@ -78,7 +94,7 @@ function renderReviewSection(item) {
           <p class="section-label">Review</p>
           <span class="status-badge status-pending">Not Reviewed</span>
         </div>
-        <p class="section-text">この${currentUnit() === "utterance" ? " utterance" : " turn"}にはまだ添削結果がありません。</p>
+        <p class="section-text">この utterance にはまだ添削結果がありません。</p>
       </section>
     `;
   }
@@ -251,54 +267,54 @@ function playItem(itemId, withPrompt) {
   startPlayback(startAt, item.end, item.id);
 }
 
-async function loadStudentSpeech(name) {
+async function loadStudentSpeech(lesson) {
   const unit = currentUnit();
-  const response = await fetch(`/api/student-speech?unit=${encodeURIComponent(unit)}&name=${encodeURIComponent(name)}`);
+  const response = await fetch(`/api/student-speech?unit=${encodeURIComponent(unit)}&lesson=${encodeURIComponent(lesson)}`);
   if (!response.ok) {
     turnList.innerHTML = `<article class="empty-card">Student ${unit} を読み込めませんでした。</article>`;
     return;
   }
 
   speechData = await response.json();
-  audioPlayer.src = `/api/audio?unit=${encodeURIComponent(unit)}&name=${encodeURIComponent(speechData.name)}`;
+  audioPlayer.src = `/api/audio?unit=${encodeURIComponent(unit)}&lesson=${encodeURIComponent(speechData.name)}`;
   currentStopAt = null;
   currentItemId = null;
   renderItems();
 
   const url = new URL(window.location.href);
   url.searchParams.set("unit", unit);
-  url.searchParams.set("name", speechData.name);
+  url.searchParams.set("lesson", speechData.name);
   window.history.replaceState({}, "", url);
 }
 
 async function loadStudentTurnList() {
   const unit = currentUnit();
-  const response = await fetch(`/api/student-speech-files?unit=${encodeURIComponent(unit)}`);
+  const response = await fetch(`/api/lessons?unit=${encodeURIComponent(unit)}`);
   const payload = await response.json();
   const items = payload.items || [];
 
   if (items.length === 0) {
-    turnsSelect.innerHTML = `<option value="">No student ${unit}s found</option>`;
-    turnList.innerHTML = `<article class="empty-card">poc/output に student_${unit}s.json がありません。</article>`;
+    lessonSelect.innerHTML = `<option value="">No lesson found</option>`;
+    turnList.innerHTML = `<article class="empty-card">poc/output/&lt;lesson&gt;/${unit === "utterance" ? "merged.student_utterances.json" : "merged.student_turns.json"} がありません。</article>`;
     speechData = null;
     updateSummary();
     return;
   }
 
-  turnsSelect.innerHTML = items
+  lessonSelect.innerHTML = items
     .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
     .join("");
 
   const url = new URL(window.location.href);
-  const selectedName = url.searchParams.get("name");
+  const selectedName = url.searchParams.get("lesson");
   const initialName = items.some((item) => item.name === selectedName) ? selectedName : items[0].name;
-  turnsSelect.value = initialName;
+  lessonSelect.value = initialName;
   await loadStudentSpeech(initialName);
 }
 
 loadButton.addEventListener("click", async () => {
-  if (!turnsSelect.value) return;
-  await loadStudentSpeech(turnsSelect.value);
+  if (!lessonSelect.value) return;
+  await loadStudentSpeech(lessonSelect.value);
 });
 
 unitSelect.addEventListener("change", async () => {

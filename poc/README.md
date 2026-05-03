@@ -8,7 +8,7 @@
 
 `poc/group_student_utterances.py` は、`student_turns.json` を入力にして、曖昧な境界だけを OpenAI API で判定しながら、生徒発話をより大きい utterance 単位に再グルーピングする簡易スクリプトです。
 
-`poc/review_student_turns.py` は、`student_turns.json` を入力にして、生徒発話 turn ごとの添削結果を OpenAI API で生成する簡易スクリプトです。
+`poc/review_student_utterances.py` は、`student_utterances.json` を入力にして、生徒発話 utterance ごとの添削結果を OpenAI API で生成する簡易スクリプトです。
 
 `poc/split_mp3_with_overlap.py` は、1 本の mp3 を重なりありで複数 part に分割し、後段の diarize / merge 用 manifest を出力する簡易スクリプトです。
 
@@ -47,15 +47,15 @@
 1. diarized transcript を用意する
 2. `infer_student_speaker.py` で raw speaker を `student / teacher` に推定する
 3. `extract_student_turns.py` で生徒発話を `turn` 単位に抽出する
-4. 必要なら `group_student_utterances.py` でより大きい `utterance` 単位にまとめる
-5. `review_student_turns.py` で turn ごとの添削を作る
+4. `group_student_utterances.py` でより大きい `utterance` 単位にまとめる
+5. `review_student_utterances.py` で utterance ごとの添削を作る
 6. `ui_segments` / `ui_student_turns` で結果を確認する
 
 最終的に欲しいもの:
 - `*.speaker_roles.json`
 - `*.student_turns.json`
 - `*.student_utterances.json`
-- `*.student_turn_reviews.json`
+- `*.student_utterance_reviews.json`
 
 ### 用語
 
@@ -122,14 +122,14 @@ uv run python poc/group_student_utterances.py \
 
 出力先はデフォルトで `poc/output/*.student_utterances.json` です。
 
-## 生徒発話 turn ごとの添削
+## 生徒発話 utterance ごとの添削
 
 ```bash
-uv run python poc/review_student_turns.py \
-  "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_turns.json"
+uv run python poc/review_student_utterances.py \
+  "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_utterances.json"
 ```
 
-出力先はデフォルトで `poc/output/*.student_turn_reviews.json` です。
+出力先はデフォルトで `poc/output/*.student_utterance_reviews.json` です。
 
 ## 重なりあり mp3 分割
 
@@ -159,7 +159,7 @@ uv run uvicorn app:app --app-dir poc/ui_segments --reload
 
 ブラウザで `http://127.0.0.1:8000` を開きます。
 
-## Student Turn Review UI
+## Student Speech Review UI
 
 ```bash
 uv run uvicorn app:app --app-dir poc/ui_student_turns --reload
@@ -169,4 +169,4 @@ uv run uvicorn app:app --app-dir poc/ui_student_turns --reload
 
 ## 旧 PoC
 
-旧来の `merge_transcripts.py` や `transcribe_mp3_gpt4o.py` は、現在は `poc/unused/` に退避しています。
+旧来の `merge_transcripts.py`、`transcribe_mp3_gpt4o.py`、`review_student_turns.py` は、現在は `poc/unused/` に退避しています。
