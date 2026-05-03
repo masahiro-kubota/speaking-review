@@ -41,7 +41,7 @@ function updateSummary() {
 
 function renderSegments() {
   if (!transcriptData || transcriptData.segments.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="6" class="empty-row">表示できる segment がありません。</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">表示できる segment がありません。</td></tr>`;
     updateSummary();
     return;
   }
@@ -56,6 +56,7 @@ function renderSegments() {
           <td class="time-cell">${formatSeconds(segment.absolute_start)}</td>
           <td class="time-cell">${formatSeconds(segment.absolute_end)}</td>
           <td class="speaker-cell">${escapeHtml(segment.speaker || "-")}</td>
+          <td class="role-cell">${escapeHtml(segment.role || "-")}</td>
           <td class="text-cell">${escapeHtml(segment.text || "-")}</td>
         </tr>
       `;
@@ -110,7 +111,7 @@ function playSegment(segmentId, withContext) {
 async function loadTranscript(name) {
   const response = await fetch(`/api/transcript?name=${encodeURIComponent(name)}`);
   if (!response.ok) {
-    tableBody.innerHTML = `<tr><td colspan="6" class="empty-row">Transcript を読み込めませんでした。</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">Transcript を読み込めませんでした。</td></tr>`;
     return;
   }
 
@@ -132,7 +133,7 @@ async function loadTranscriptList() {
 
   if (items.length === 0) {
     transcriptSelect.innerHTML = `<option value="">No transcript found</option>`;
-    tableBody.innerHTML = `<tr><td colspan="6" class="empty-row">poc/output に diarized transcript がありません。</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">poc/output に diarized transcript がありません。</td></tr>`;
     return;
   }
 
@@ -186,5 +187,5 @@ audioPlayer.addEventListener("pause", () => {
 });
 
 loadTranscriptList().catch(() => {
-  tableBody.innerHTML = `<tr><td colspan="6" class="empty-row">初期化に失敗しました。</td></tr>`;
+  tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">初期化に失敗しました。</td></tr>`;
 });

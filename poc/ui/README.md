@@ -18,5 +18,6 @@ uv run uvicorn app:app --app-dir poc/ui --reload
 ## できること
 
 - diarized transcript の一覧表示
+- `*.speaker_roles.json` があれば role 表示
 - segment ごとの区間再生
 - `Play +1s` で前後 1 秒つき再生

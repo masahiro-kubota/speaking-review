@@ -172,7 +172,8 @@ th {
 }
 
 .time-cell,
-.speaker-cell {
+.speaker-cell,
+.role-cell {
   white-space: nowrap;
 }
 

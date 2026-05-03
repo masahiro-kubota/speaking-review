@@ -12,6 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = ROOT_DIR / "poc" / "output"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 TRANSCRIPT_SUFFIX = ".diarized.transcript.json"
+SPEAKER_ROLES_SUFFIX = ".speaker_roles.json"
 
 
 app = FastAPI(title="Transcript Review UI")
@@ -41,7 +42,35 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def flatten_segments(transcript_payload: dict) -> list[dict]:
+def speaker_roles_path_for_transcript(transcript_path: Path) -> Path:
+    return transcript_path.with_name(
+        transcript_path.name.removesuffix(TRANSCRIPT_SUFFIX) + SPEAKER_ROLES_SUFFIX
+    )
+
+
+def load_speaker_roles(transcript_path: Path) -> dict[str, str]:
+    roles_path = speaker_roles_path_for_transcript(transcript_path)
+    if not roles_path.exists():
+        return {}
+
+    payload = load_json(roles_path)
+    inference = payload.get("inference")
+    if not isinstance(inference, dict):
+        return {}
+
+    speaker_roles = inference.get("speaker_roles")
+    if not isinstance(speaker_roles, dict):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for speaker, role in speaker_roles.items():
+        if not isinstance(speaker, str) or not isinstance(role, str):
+            continue
+        normalized[speaker.strip()] = role.strip()
+    return normalized
+
+
+def flatten_segments(transcript_payload: dict, speaker_roles: dict[str, str]) -> list[dict]:
     flattened: list[dict] = []
     chunks = transcript_payload.get("chunks")
     if not isinstance(chunks, list):
@@ -56,12 +85,14 @@ def flatten_segments(transcript_payload: dict) -> list[dict]:
         for segment_index, segment in enumerate(segments, start=1):
             raw_start = float(segment.get("start", 0))
             raw_end = float(segment.get("end", 0))
+            speaker = str(segment.get("speaker", "")).strip()
             flattened.append(
                 {
                     "id": f"c{chunk_index}s{segment_index}",
                     "chunk_index": chunk_index,
                     "segment_index": segment_index,
-                    "speaker": str(segment.get("speaker", "")).strip(),
+                    "speaker": speaker,
+                    "role": speaker_roles.get(speaker, ""),
                     "text": str(segment.get("text", "")).strip(),
                     "start": round(raw_start, 3),
                     "end": round(raw_end, 3),
@@ -76,12 +107,14 @@ def flatten_segments(transcript_payload: dict) -> list[dict]:
 def build_transcript_payload(transcript_path: Path) -> dict:
     transcript_payload = load_json(transcript_path)
     source_file = Path(str(transcript_payload.get("source_file", "")))
-    segments = flatten_segments(transcript_payload)
+    speaker_roles = load_speaker_roles(transcript_path)
+    segments = flatten_segments(transcript_payload, speaker_roles)
     return {
         "name": transcript_path.name,
         "source_file": str(source_file),
         "source_file_name": source_file.name,
         "duration_seconds": transcript_payload.get("duration_seconds"),
+        "speaker_roles": speaker_roles,
         "segments": segments,
     }
 
