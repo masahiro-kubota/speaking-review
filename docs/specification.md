@@ -65,20 +65,13 @@ Markdown出力
 ### 1. 文字起こし
 - 音声をテキストに変換
 - 英語対応
-- タイムスタンプ付き
-
-出力例：
-```
-
-[00:01.200 - 00:03.400] Hello, how are you?
-
-```
 
 ---
 
 ### 2. 話者分離（ダイアライゼーション）
 - 話者を2人に分類
 - `Speaker A / Speaker B` でラベル付与
+→これはtranscribeしたものをLLMで分ければOK。
 
 出力例：
 ```
@@ -92,7 +85,7 @@ Markdown出力
 
 ### 3. 自分の発話抽出
 - どちらか一方の話者を「自分」として扱う
-- MVPでは手動指定でOK
+→chatGPTのAPIで2の話者分離と同時にやる
 
 出力例：
 ```
@@ -142,6 +135,7 @@ Explanation
 ### 5. レポート生成
 
 Markdown形式で出力
+生徒側の発言ごとに、添削を実施。
 
 #### 出力例
 
@@ -170,58 +164,6 @@ Explanation:
 ````
 
 ---
-
-## 非機能要件
-
-### 実行環境
-
-* Ubuntu
-* Python 3.10+
-
-### 実行形態
-
-* CLIツール
-
-### パフォーマンス
-
-* 10〜30分音声を処理可能
-* リアルタイム性は不要
-
----
-
-## 技術構成（MVP）
-
-### 音声処理
-
-* Whisper系（例: faster-whisper）
-
-### 話者分離
-
-* WhisperX or pyannoteベース
-
-### LLM
-
-* OpenAI API or ローカルLLM（Ollama等）
-
----
-
-## ディレクトリ構成（例）
-
-```
-project/
-├── input/
-│   └── audio.mp3
-├── output/
-│   ├── transcript.json
-│   └── review.md
-├── src/
-│   ├── transcribe.py
-│   ├── diarize.py
-│   ├── extract.py
-│   ├── review.py
-│   └── main.py
-└── config.yaml
-```
 
 ---
 

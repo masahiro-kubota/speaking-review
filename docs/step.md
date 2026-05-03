@@ -128,39 +128,7 @@ DMM英会話などのレッスン音声を使って、
 
 ---
 
-## Step 4. 自分の発話だけ抽出する
-
-### 目的
-
-添削対象を自分の英語だけに絞る。
-
-### 作業
-
-* MVPでは `Speaker A` または `Speaker B` を手動で指定する
-* 指定した話者の発話だけを抽出する
-* 1発話ずつ配列化する
-
-### 出力例
-
-```json
-[
-  "I go to there yesterday.",
-  "He don't like it."
-]
-```
-
-### 確認ポイント
-
-* 自分の発話だけが抜けているか
-* 先生側の発話が混ざりすぎていないか
-
-### 完了条件
-
-* 添削対象となる自分の発話一覧が作れる
-
----
-
-## Step 5. 英語添削プロンプトを接続する
+## Step 4. 英語添削プロンプトを接続する
 
 ### 目的
 
@@ -191,7 +159,7 @@ DMM英会話などのレッスン音声を使って、
 
 ---
 
-## Step 6. Markdownレポートを生成する
+## Step 5. Markdownレポートを生成する
 
 ### 目的
 
@@ -235,7 +203,7 @@ Explanation:
 
 ---
 
-## Step 7. CLIとしてまとめる
+## Step 6. CLIとしてまとめる
 
 ### 目的
 
@@ -246,12 +214,11 @@ Explanation:
 * `main.py` か `cli.py` を作る
 * 入力音声パスを引数で受ける
 * 出力先ディレクトリを指定できるようにする
-* 必要なら話者指定も引数で受ける
 
 ### 実行イメージ
 
 ```bash
-python main.py --input lesson.mp3 --self-speaker B --output output/
+python main.py --input lesson.mp3 --output output/
 ```
 
 ### 完了条件
@@ -260,7 +227,7 @@ python main.py --input lesson.mp3 --self-speaker B --output output/
 
 ---
 
-## Step 8. 実データで評価する
+## Step 7. 実データで評価する
 
 ### 目的
 
@@ -286,7 +253,7 @@ MVPが本当に役立つかを確認する。
 
 ---
 
-## Step 9. 必要なら改善する
+## Step 8. 必要なら改善する
 
 ### 改善候補
 
@@ -330,4 +297,3 @@ MVPが本当に役立つかを確認する。
 5. Markdown出力
 
 これで価値が出れば、その後に改善する。
-
