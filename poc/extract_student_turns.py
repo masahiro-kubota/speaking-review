@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Extract student turns from a diarized transcript and speaker role mapping.
 
+A "turn" in this PoC means:
+    - a student-side chunk after raw diarization segments have been lightly merged
+    - teacher backchannels such as short "mm-hmm" style acknowledgments are ignored
+    - substantive teacher speech creates a boundary
+
+This is still a rough intermediate unit, not the final review unit.
+Later, `group_student_utterances.py` can merge multiple student turns into a
+larger "utterance" when they are semantically part of the same answer.
+
 Example:
     uv run python poc/extract_student_turns.py \
       "poc/output/2026年5月02日 12_30のレッスン.part1of2.diarized.transcript.json" \
@@ -11,11 +20,32 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 DEFAULT_MERGE_GAP_SECONDS = 1.5
+MAX_BACKCHANNEL_DURATION_SECONDS = 1.2
+MAX_BACKCHANNEL_WORDS = 3
+TEACHER_BACKCHANNEL_KEYS = {
+    "ah",
+    "gotit",
+    "hmm",
+    "hm",
+    "isee",
+    "mhm",
+    "mmhmm",
+    "oh",
+    "okay",
+    "ok",
+    "right",
+    "uhhuh",
+    "uhuh",
+    "yeah",
+    "yep",
+    "yes",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -145,6 +175,44 @@ def stitch_text(left: str, right: str) -> str:
     return f"{left} {right}"
 
 
+def word_count(text: str) -> int:
+    return len(re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", text))
+
+
+def normalize_text_key(text: str) -> str:
+    return re.sub(r"[^a-z]+", "", text.lower())
+
+
+def is_teacher_backchannel(turn: dict) -> bool:
+    if turn["role"] != "teacher":
+        return False
+    if turn["duration_seconds"] > MAX_BACKCHANNEL_DURATION_SECONDS:
+        return False
+    if word_count(turn["text"]) > MAX_BACKCHANNEL_WORDS:
+        return False
+    return normalize_text_key(turn["text"]) in TEACHER_BACKCHANNEL_KEYS
+
+
+def build_student_turn(
+    turn_id: str,
+    student_turn: dict,
+    previous_teacher_turn: dict | None,
+) -> dict:
+    return {
+        "turn_id": turn_id,
+        "speaker_labels": student_turn["speaker_labels"],
+        "start": student_turn["start"],
+        "end": student_turn["end"],
+        "duration_seconds": student_turn["duration_seconds"],
+        "segment_ids": student_turn["segment_ids"],
+        "raw_segment_ids": student_turn["raw_segment_ids"],
+        "text": student_turn["text"],
+        "prev_teacher_text": previous_teacher_turn["text"] if previous_teacher_turn else None,
+        "prev_teacher_start": previous_teacher_turn["start"] if previous_teacher_turn else None,
+        "prev_teacher_end": previous_teacher_turn["end"] if previous_teacher_turn else None,
+    }
+
+
 def merge_role_turns(
     segments: list[dict],
     speaker_roles: dict[str, str],
@@ -200,28 +268,71 @@ def merge_role_turns(
 def build_student_turns(role_turns: list[dict]) -> list[dict]:
     student_turns: list[dict] = []
     previous_teacher_turn: dict | None = None
+    current_student_turn: dict | None = None
+    pending_backchannel = False
 
     for turn in role_turns:
         if turn["role"] == "teacher":
+            if is_teacher_backchannel(turn) and current_student_turn is not None:
+                pending_backchannel = True
+                continue
+
+            if current_student_turn is not None:
+                turn_id = f"student_turn_{len(student_turns) + 1:03d}"
+                student_turns.append(
+                    build_student_turn(turn_id, current_student_turn, previous_teacher_turn)
+                )
+                current_student_turn = None
+                pending_backchannel = False
+
             previous_teacher_turn = turn
             continue
 
-        turn_id = f"student_turn_{len(student_turns) + 1:03d}"
-        student_turns.append(
-            {
-                "turn_id": turn_id,
-                "speaker_labels": turn["speaker_labels"],
+        if current_student_turn is None:
+            current_student_turn = {
+                "speaker_labels": list(turn["speaker_labels"]),
                 "start": turn["start"],
                 "end": turn["end"],
                 "duration_seconds": turn["duration_seconds"],
-                "segment_ids": turn["segment_ids"],
-                "raw_segment_ids": turn["raw_segment_ids"],
+                "segment_ids": list(turn["segment_ids"]),
+                "raw_segment_ids": list(turn["raw_segment_ids"]),
                 "text": turn["text"],
-                "prev_teacher_text": previous_teacher_turn["text"] if previous_teacher_turn else None,
-                "prev_teacher_start": previous_teacher_turn["start"] if previous_teacher_turn else None,
-                "prev_teacher_end": previous_teacher_turn["end"] if previous_teacher_turn else None,
             }
+            pending_backchannel = False
+            continue
+
+        if not pending_backchannel:
+            turn_id = f"student_turn_{len(student_turns) + 1:03d}"
+            student_turns.append(
+                build_student_turn(turn_id, current_student_turn, previous_teacher_turn)
+            )
+            current_student_turn = {
+                "speaker_labels": list(turn["speaker_labels"]),
+                "start": turn["start"],
+                "end": turn["end"],
+                "duration_seconds": turn["duration_seconds"],
+                "segment_ids": list(turn["segment_ids"]),
+                "raw_segment_ids": list(turn["raw_segment_ids"]),
+                "text": turn["text"],
+            }
+            continue
+
+        current_student_turn["text"] = stitch_text(current_student_turn["text"], turn["text"])
+        current_student_turn["end"] = turn["end"]
+        current_student_turn["duration_seconds"] = round(
+            current_student_turn["end"] - current_student_turn["start"],
+            3,
         )
+        for speaker_label in turn["speaker_labels"]:
+            if speaker_label not in current_student_turn["speaker_labels"]:
+                current_student_turn["speaker_labels"].append(speaker_label)
+        current_student_turn["segment_ids"].extend(turn["segment_ids"])
+        current_student_turn["raw_segment_ids"].extend(turn["raw_segment_ids"])
+        pending_backchannel = False
+
+    if current_student_turn is not None:
+        turn_id = f"student_turn_{len(student_turns) + 1:03d}"
+        student_turns.append(build_student_turn(turn_id, current_student_turn, previous_teacher_turn))
 
     return student_turns
 
