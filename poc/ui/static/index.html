@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transcript Review UI</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">PoC UI</p>
+          <h1>Transcript Review</h1>
+          <p class="hero-copy">
+            segment ごとの音声をすぐ再生して、文字起こしが合っているか確認するための最小 UI。
+          </p>
+        </div>
+        <div class="picker">
+          <label for="transcript-select">Transcript</label>
+          <div class="picker-row">
+            <select id="transcript-select"></select>
+            <button id="load-button" type="button">Load</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="meta">
+        <div class="meta-card">
+          <span class="meta-label">Audio</span>
+          <strong id="audio-file-name">-</strong>
+        </div>
+        <div class="meta-card">
+          <span class="meta-label">Segments</span>
+          <strong id="segment-count">0</strong>
+        </div>
+        <div class="meta-card">
+          <span class="meta-label">Duration</span>
+          <strong id="duration-seconds">-</strong>
+        </div>
+      </section>
+
+      <section class="player-panel">
+        <audio id="audio-player" controls preload="metadata"></audio>
+      </section>
+
+      <section class="table-panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Play</th>
+              <th>Play + Context</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Speaker</th>
+              <th>Text</th>
+            </tr>
+          </thead>
+          <tbody id="segment-table-body">
+            <tr>
+              <td colspan="6" class="empty-row">Transcript を選んでください。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
