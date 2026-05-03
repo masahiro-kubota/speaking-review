@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Student Turn Review UI</title>
-    <link rel="stylesheet" href="/student-turn-static/styles.css?v=1" />
+    <link rel="stylesheet" href="/student-turn-static/styles.css?v=4" />
   </head>
   <body>
     <main class="page">
@@ -17,7 +17,14 @@
           </p>
         </div>
         <div class="picker">
-          <label for="turns-select">Student Turns</label>
+          <label for="unit-select">Unit</label>
+          <div class="picker-row single-row">
+            <select id="unit-select">
+              <option value="turn">Turn</option>
+              <option value="utterance">Utterance</option>
+            </select>
+          </div>
+          <label for="turns-select">Student Speech</label>
           <div class="picker-row">
             <select id="turns-select"></select>
             <button id="load-button" type="button">Load</button>
@@ -31,8 +38,8 @@
           <strong id="audio-file-name">-</strong>
         </div>
         <div class="meta-card">
-          <span class="meta-label">Turns</span>
-          <strong id="turn-count">0</strong>
+          <span class="meta-label" id="item-count-label">Turns</span>
+          <strong id="item-count">0</strong>
         </div>
         <div class="meta-card">
           <span class="meta-label">Student Labels</span>
@@ -41,6 +48,10 @@
         <div class="meta-card">
           <span class="meta-label">Teacher Labels</span>
           <strong id="teacher-speakers">-</strong>
+        </div>
+        <div class="meta-card">
+          <span class="meta-label">Reviews</span>
+          <strong id="review-summary">-</strong>
         </div>
       </section>
 
@@ -53,6 +64,6 @@
       </section>
     </main>
 
-    <script src="/student-turn-static/app.js?v=1" defer></script>
+    <script src="/student-turn-static/app.js?v=4" defer></script>
   </body>
 </html>

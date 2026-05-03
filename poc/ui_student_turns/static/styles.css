@@ -8,6 +8,10 @@
   --accent-soft: #dff1ec;
   --prompt-bg: #f8f2e7;
   --student-bg: #eef7f4;
+  --review-bg: #f5f3fb;
+  --error-bg: #fbe8e5;
+  --warning-bg: #fbf1df;
+  --pending-bg: #f1efe9;
   --shadow: 0 12px 30px rgba(39, 33, 24, 0.08);
 }
 
@@ -103,6 +107,10 @@ h1 {
   gap: 0.75rem;
 }
 
+.single-row {
+  grid-template-columns: 1fr;
+}
+
 select,
 button {
   border-radius: 12px;
@@ -133,7 +141,7 @@ button:disabled {
 
 .meta {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
@@ -191,6 +199,7 @@ audio {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .turn-section {
@@ -204,6 +213,103 @@ audio {
 
 .student-section {
   background: var(--student-bg);
+}
+
+.review-block {
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.review-complete {
+  background: var(--review-bg);
+}
+
+.review-skipped {
+  background: var(--warning-bg);
+}
+
+.review-error {
+  background: var(--error-bg);
+}
+
+.review-pending {
+  background: var(--pending-bg);
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.review-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.review-card {
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+}
+
+.feedback-card,
+.issues-card {
+  margin-top: 1rem;
+}
+
+.status-badge {
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.status-reviewed {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.status-skipped {
+  background: #f3ddad;
+  color: #865b06;
+}
+
+.status-error {
+  background: #f2c5bf;
+  color: #9c2d20;
+}
+
+.status-pending {
+  background: #e4dfd6;
+  color: #635a4b;
+}
+
+.issue-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.issue-item + .issue-item {
+  margin-top: 0.85rem;
+}
+
+.issue-meta {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.issue-line {
+  margin: 0.18rem 0 0;
+  line-height: 1.55;
 }
 
 .section-label {
@@ -235,7 +341,8 @@ audio {
 
   .hero,
   .meta,
-  .turn-sections {
+  .turn-sections,
+  .review-columns {
     grid-template-columns: 1fr;
   }
 
