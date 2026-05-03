@@ -16,6 +16,8 @@
 
 `poc/diarize_split_manifest_and_merge.py` は、1 本の mp3 に対して `split -> diarize -> pairwise merge` を一発で回す orchestrator です。
 
+`poc/build_lesson_review_bundle.py` は、1 本の mp3 に対して `split -> diarize -> pairwise merge -> speaker role inference -> student turn extraction -> utterance grouping -> utterance review` を一発で回す top-level orchestrator です。
+
 `poc/ui_segments` には、diarized transcript を見ながら segment 区間を再生して確認するための最小 UI があります。
 
 `poc/ui_student_turns` には、`student_turns.json` / `student_utterances.json` を見ながら生徒発話の turn / utterance 単位で prompt と返答を確認するための最小 UI があります。
@@ -44,6 +46,8 @@
 
 ### 2. 生徒の speaking 添削まで進めたい場合
 
+最短は `build_lesson_review_bundle.py` を使うことです。
+
 1. diarized transcript を用意する
 2. `infer_student_speaker.py` で raw speaker を `student / teacher` に推定する
 3. `extract_student_turns.py` で生徒発話を `turn` 単位に抽出する
@@ -63,6 +67,36 @@
 - `utterance`: 複数 turn をまたいでもよい、より意味まとまりに近い単位
 
 ## 一発実行
+
+```bash
+uv run python poc/build_lesson_review_bundle.py \
+  "data/2026年5月02日 12_30のレッスン.mp3" \
+  --reuse-split false \
+  --reuse-diarize false \
+  --reuse-merge false \
+  --reuse-speaker-roles false \
+  --reuse-turns false \
+  --reuse-utterances false \
+  --reuse-reviews false
+```
+
+出力先はデフォルトで `poc/output/<original mp3 file stem>/` です。
+
+`reuse` はフェーズごとに明示指定します。
+
+- `--reuse-split true|false`
+- `--reuse-diarize true|false`
+- `--reuse-merge true|false`
+- `--reuse-speaker-roles true|false`
+- `--reuse-turns true|false`
+- `--reuse-utterances true|false`
+- `--reuse-reviews true|false`
+
+デフォルトはすべて `false` です。
+
+`true` の場合は、そのフェーズで必要な成果物がすべて既に存在している必要があります。不足がある場合は自動補完せずエラーで止まります。
+
+## split -> diarize -> merge だけ一発実行
 
 ```bash
 uv run python poc/diarize_split_manifest_and_merge.py \
