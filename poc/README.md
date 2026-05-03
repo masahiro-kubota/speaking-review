@@ -1,16 +1,10 @@
 # PoC
 
-`poc/transcribe_mp3.py` は、リポジトリ直下の `.env` にある `OPENAI_API_KEY` を使って `data/*.mp3` を文字起こしする簡易スクリプトです。
+`poc/transcribe_mp3.py` は、リポジトリ直下の `.env` にある `OPENAI_API_KEY` を使って指定した mp3 を文字起こしする簡易スクリプトです。
 
 `poc/merge_transcripts.py` は、重なりありで分割した transcript JSON 2本を受け取り、前半 transcript の末尾 sentence 群を anchor にして後半 transcript の重複 prefix を探し、重複部分と結合結果を JSON で出力する簡易スクリプトです。
 
 ## 使い方
-
-```bash
-uv run python poc/transcribe_mp3.py
-```
-
-特定ファイルだけ処理する場合:
 
 ```bash
 uv run python poc/transcribe_mp3.py data/2026_4_24_9_00.mp3

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Merge overlapping transcript chunks by finding the last sentence(s) of A in the head of B."""
+"""Merge overlapping transcript chunks by finding the last sentence(s) of A in the head of B.
+
+Example:
+    uv run python poc/merge_transcripts.py \
+      poc/output/2026_4_24_9_00_0to800s.transcript.json \
+      poc/output/2026_4_24_9_00_700to1500s.transcript.json
+"""
 
 from __future__ import annotations
 

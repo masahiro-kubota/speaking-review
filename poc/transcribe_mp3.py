@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Transcribe mp3 files in ./data with the OpenAI Audio Transcriptions API."""
+"""Transcribe a single mp3 file with the OpenAI Audio Transcriptions API.
+
+Requires:
+    - OPENAI_API_KEY in the repository root .env file or environment
+    - ffprobe available on PATH for audio duration inspection
+    - ffmpeg available on PATH for splitting long audio files
+
+Example:
+    uv run python poc/transcribe_mp3.py data/2026_4_24_9_00.mp3
+"""
 
 from __future__ import annotations
 
@@ -16,10 +25,11 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_DATA_DIR = ROOT_DIR / "data"
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "poc" / "output"
 DEFAULT_ENV_PATH = ROOT_DIR / ".env"
 API_URL = "https://api.openai.com/v1/audio/transcriptions"
+TRANSCRIPTION_MODEL = "gpt-4o-transcribe"
+TRANSCRIPTION_LANGUAGE = "en"
 MAX_MODEL_DURATION_SECONDS = 1400
 DEFAULT_CHUNK_DURATION_SECONDS = 1200
 
@@ -41,22 +51,11 @@ def load_env_file(env_path: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Transcribe one mp3 file or all mp3 files in ./data.",
+        description="Transcribe a single mp3 file.",
     )
     parser.add_argument(
         "input",
-        nargs="?",
-        help="Path to an mp3 file. If omitted, all mp3 files under ./data are processed.",
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4o-transcribe",
-        help="OpenAI transcription model to use.",
-    )
-    parser.add_argument(
-        "--language",
-        default="en",
-        help="Language hint passed to the API. Example: en, ja.",
+        help="Path to an mp3 file.",
     )
     parser.add_argument(
         "--output-dir",
@@ -67,22 +66,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_targets(user_input: str | None) -> list[Path]:
-    if user_input:
-        target = Path(user_input).expanduser().resolve()
-        if not target.exists():
-            raise FileNotFoundError(f"Input file not found: {target}")
-        if target.suffix.lower() != ".mp3":
-            raise ValueError(f"Only mp3 files are supported in this PoC: {target}")
-        return [target]
-
-    if not DEFAULT_DATA_DIR.exists():
-        raise FileNotFoundError(f"Data directory not found: {DEFAULT_DATA_DIR}")
-
-    targets = sorted(path for path in DEFAULT_DATA_DIR.glob("*.mp3") if path.is_file())
-    if not targets:
-        raise FileNotFoundError(f"No mp3 files found in: {DEFAULT_DATA_DIR}")
-    return targets
+def resolve_target(user_input: str) -> Path:
+    target = Path(user_input).expanduser().resolve()
+    if not target.exists():
+        raise FileNotFoundError(f"Input file not found: {target}")
+    if target.suffix.lower() != ".mp3":
+        raise ValueError(f"Only mp3 files are supported in this PoC: {target}")
+    return target
 
 
 def build_multipart_body(fields: dict[str, str], file_field: str, file_path: Path) -> tuple[bytes, str]:
@@ -186,11 +176,11 @@ def split_audio_file(file_path: Path, output_dir: Path, chunk_duration_seconds: 
     return chunk_paths
 
 
-def transcribe_chunk(file_path: Path, api_key: str, model: str, language: str) -> dict:
+def transcribe_chunk(file_path: Path, api_key: str) -> dict:
     body, content_type = build_multipart_body(
         fields={
-            "model": model,
-            "language": language,
+            "model": TRANSCRIPTION_MODEL,
+            "language": TRANSCRIPTION_LANGUAGE,
             "response_format": "json",
         },
         file_field="file",
@@ -256,8 +246,6 @@ def merge_usage(chunk_results: list[dict]) -> dict | None:
 
 def combine_chunk_results(
     source_path: Path,
-    model: str,
-    language: str,
     duration_seconds: float,
     chunk_duration_seconds: int,
     chunk_results: list[dict],
@@ -265,8 +253,8 @@ def combine_chunk_results(
     combined = {
         "text": "\n\n".join(result.get("text", "").strip() for result in chunk_results if result.get("text")),
         "source_file": str(source_path),
-        "model": model,
-        "language": language,
+        "model": TRANSCRIPTION_MODEL,
+        "language": TRANSCRIPTION_LANGUAGE,
         "duration_seconds": duration_seconds,
         "chunking": {
             "applied": True,
@@ -295,10 +283,10 @@ def combine_chunk_results(
     return combined
 
 
-def transcribe_file(file_path: Path, api_key: str, model: str, language: str) -> dict:
+def transcribe_file(file_path: Path, api_key: str) -> dict:
     duration_seconds = get_audio_duration_seconds(file_path)
     if duration_seconds <= MAX_MODEL_DURATION_SECONDS:
-        return transcribe_chunk(file_path=file_path, api_key=api_key, model=model, language=language)
+        return transcribe_chunk(file_path=file_path, api_key=api_key)
 
     with tempfile.TemporaryDirectory(prefix="transcribe-chunks-") as temp_dir:
         chunk_paths = split_audio_file(
@@ -306,15 +294,10 @@ def transcribe_file(file_path: Path, api_key: str, model: str, language: str) ->
             output_dir=Path(temp_dir),
             chunk_duration_seconds=DEFAULT_CHUNK_DURATION_SECONDS,
         )
-        chunk_results = [
-            transcribe_chunk(file_path=chunk_path, api_key=api_key, model=model, language=language)
-            for chunk_path in chunk_paths
-        ]
+        chunk_results = [transcribe_chunk(file_path=chunk_path, api_key=api_key) for chunk_path in chunk_paths]
 
     return combine_chunk_results(
         source_path=file_path,
-        model=model,
-        language=language,
         duration_seconds=duration_seconds,
         chunk_duration_seconds=DEFAULT_CHUNK_DURATION_SECONDS,
         chunk_results=chunk_results,
@@ -338,28 +321,21 @@ def main() -> int:
         return 1
 
     try:
-        targets = resolve_targets(args.input)
+        target = resolve_target(args.input)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
-    exit_code = 0
-    for target in targets:
-        print(f"Transcribing: {target}", flush=True)
-        try:
-            result = transcribe_file(
-                file_path=target,
-                api_key=api_key,
-                model=args.model,
-                language=args.language,
-            )
-            output_path = save_transcript(result, target, args.output_dir)
-            print(f"Saved transcript to: {output_path}", flush=True)
-        except Exception as exc:  # noqa: BLE001
-            exit_code = 1
-            print(str(exc), file=sys.stderr)
+    print(f"Transcribing: {target}", flush=True)
+    try:
+        result = transcribe_file(file_path=target, api_key=api_key)
+        output_path = save_transcript(result, target, args.output_dir)
+        print(f"Saved transcript to: {output_path}", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(str(exc), file=sys.stderr)
+        return 1
 
-    return exit_code
+    return 0
 
 
 if __name__ == "__main__":
