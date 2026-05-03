@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Transcribe a single mp3 file with the OpenAI Audio Transcriptions API.
+"""Transcribe a single mp3 file with OpenAI gpt-4o-transcribe.
 
 Requires:
     - OPENAI_API_KEY in the repository root .env file or environment
@@ -7,7 +7,7 @@ Requires:
     - ffmpeg available on PATH for splitting long audio files
 
 Example:
-    uv run python poc/transcribe_mp3.py data/2026_4_24_9_00.mp3
+    uv run python poc/transcribe_mp3_gpt4o.py data/2026_4_24_9_00.mp3
 """
 
 from __future__ import annotations
@@ -109,6 +109,7 @@ def build_multipart_body(fields: dict[str, str], file_field: str, file_path: Pat
 
 
 def get_audio_duration_seconds(file_path: Path) -> float:
+    print(f"Inspecting audio duration with ffprobe: {file_path}", flush=True)
     try:
         result = subprocess.run(
             [
@@ -139,6 +140,10 @@ def get_audio_duration_seconds(file_path: Path) -> float:
 
 def split_audio_file(file_path: Path, output_dir: Path, chunk_duration_seconds: int) -> list[Path]:
     output_pattern = output_dir / f"{file_path.stem}.part%03d{file_path.suffix.lower()}"
+    print(
+        f"Splitting long audio with ffmpeg into {chunk_duration_seconds}s chunks: {file_path}",
+        flush=True,
+    )
 
     try:
         subprocess.run(
@@ -173,10 +178,11 @@ def split_audio_file(file_path: Path, output_dir: Path, chunk_duration_seconds: 
     chunk_paths = sorted(output_dir.glob(f"{file_path.stem}.part*{file_path.suffix.lower()}"))
     if not chunk_paths:
         raise RuntimeError(f"ffmpeg did not produce any chunks for {file_path.name}.")
+    print(f"Created {len(chunk_paths)} chunk(s).", flush=True)
     return chunk_paths
 
 
-def transcribe_chunk(file_path: Path, api_key: str) -> dict:
+def transcribe_chunk(file_path: Path, api_key: str, chunk_label: str | None = None) -> dict:
     body, content_type = build_multipart_body(
         fields={
             "model": TRANSCRIPTION_MODEL,
@@ -197,8 +203,11 @@ def transcribe_chunk(file_path: Path, api_key: str) -> dict:
         method="POST",
     )
 
+    label = chunk_label or file_path.name
+    print(f"Uploading audio to OpenAI transcription API: {label}", flush=True)
     try:
         with urllib.request.urlopen(request) as response:
+            print(f"Received API response: {label} (HTTP {response.status})", flush=True)
             payload = response.read().decode("utf-8")
             return json.loads(payload)
     except urllib.error.HTTPError as exc:
@@ -285,7 +294,9 @@ def combine_chunk_results(
 
 def transcribe_file(file_path: Path, api_key: str) -> dict:
     duration_seconds = get_audio_duration_seconds(file_path)
+    print(f"Audio duration: {duration_seconds:.1f}s", flush=True)
     if duration_seconds <= MAX_MODEL_DURATION_SECONDS:
+        print("Audio fits in a single API request.", flush=True)
         return transcribe_chunk(file_path=file_path, api_key=api_key)
 
     with tempfile.TemporaryDirectory(prefix="transcribe-chunks-") as temp_dir:
@@ -294,7 +305,16 @@ def transcribe_file(file_path: Path, api_key: str) -> dict:
             output_dir=Path(temp_dir),
             chunk_duration_seconds=DEFAULT_CHUNK_DURATION_SECONDS,
         )
-        chunk_results = [transcribe_chunk(file_path=chunk_path, api_key=api_key) for chunk_path in chunk_paths]
+        chunk_results = []
+        for index, chunk_path in enumerate(chunk_paths, start=1):
+            print(f"Processing chunk {index}/{len(chunk_paths)}: {chunk_path.name}", flush=True)
+            chunk_results.append(
+                transcribe_chunk(
+                    file_path=chunk_path,
+                    api_key=api_key,
+                    chunk_label=f"chunk {index}/{len(chunk_paths)}",
+                )
+            )
 
     return combine_chunk_results(
         source_path=file_path,
