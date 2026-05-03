@@ -8,6 +8,10 @@
 
 `poc/extract_student_turns.py` は、diarized transcript JSON と `speaker_roles.json` を入力にして、生徒側の発話だけを turn 単位にまとめた JSON を出力する簡易スクリプトです。
 
+`poc/group_student_utterances.py` は、`student_turns.json` を入力にして、曖昧な境界だけを OpenAI API で判定しながら、生徒発話をより大きい utterance 単位に再グルーピングする簡易スクリプトです。
+
+`poc/review_student_turns.py` は、`student_turns.json` を入力にして、生徒発話 turn ごとの添削結果を OpenAI API で生成する簡易スクリプトです。
+
 `poc/merge_transcripts.py` は、重なりありで分割した transcript JSON 2本を受け取り、前半 transcript の末尾 sentence 群を anchor にして後半 transcript の重複 prefix を探し、重複部分と結合結果を JSON で出力する簡易スクリプトです。
 
 `poc/ui_segments` には、diarized transcript を見ながら segment 区間を再生して確認するための最小 UI があります。
@@ -48,6 +52,24 @@ uv run python poc/extract_student_turns.py \
 ```
 
 出力先はデフォルトで `poc/output/*.student_turns.json` です。
+
+## 生徒発話 utterance への再グルーピング
+
+```bash
+uv run python poc/group_student_utterances.py \
+  "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_turns.json"
+```
+
+出力先はデフォルトで `poc/output/*.student_utterances.json` です。
+
+## 生徒発話 turn ごとの添削
+
+```bash
+uv run python poc/review_student_turns.py \
+  "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_turns.json"
+```
+
+出力先はデフォルトで `poc/output/*.student_turn_reviews.json` です。
 
 ## Segment Review UI
 
