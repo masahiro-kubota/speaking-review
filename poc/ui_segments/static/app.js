@@ -1,4 +1,4 @@
-const transcriptSelect = document.getElementById("transcript-select");
+const lessonSelect = document.getElementById("lesson-select");
 const loadButton = document.getElementById("load-button");
 const audioPlayer = document.getElementById("audio-player");
 const audioFileName = document.getElementById("audio-file-name");
@@ -108,51 +108,51 @@ function playSegment(segmentId, withContext) {
   startPlayback(startAt, endAt, segment.id);
 }
 
-async function loadTranscript(name) {
-  const response = await fetch(`/api/transcript?name=${encodeURIComponent(name)}`);
+async function loadLesson(lesson) {
+  const response = await fetch(`/api/lesson?lesson=${encodeURIComponent(lesson)}`);
   if (!response.ok) {
-    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">Transcript を読み込めませんでした。</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">Lesson を読み込めませんでした。</td></tr>`;
     return;
   }
 
   transcriptData = await response.json();
-  audioPlayer.src = `/api/audio?name=${encodeURIComponent(transcriptData.name)}`;
+  audioPlayer.src = `/api/audio?lesson=${encodeURIComponent(transcriptData.name)}`;
   currentStopAt = null;
   currentSegmentId = null;
   renderSegments();
 
   const url = new URL(window.location.href);
-  url.searchParams.set("name", transcriptData.name);
+  url.searchParams.set("lesson", transcriptData.name);
   window.history.replaceState({}, "", url);
 }
 
-async function loadTranscriptList() {
-  const response = await fetch("/api/transcripts");
+async function loadLessonList() {
+  const response = await fetch("/api/lessons");
   const payload = await response.json();
   const items = payload.items || [];
 
   if (items.length === 0) {
-    transcriptSelect.innerHTML = `<option value="">No transcript found</option>`;
-    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">poc/output に diarized transcript がありません。</td></tr>`;
+    lessonSelect.innerHTML = `<option value="">No lesson found</option>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">poc/output/&lt;lesson&gt;/merged.diarized.transcript.json がありません。</td></tr>`;
     return;
   }
 
-  transcriptSelect.innerHTML = items
+  lessonSelect.innerHTML = items
     .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
     .join("");
 
   const url = new URL(window.location.href);
-  const selectedName = url.searchParams.get("name");
+  const selectedName = url.searchParams.get("lesson");
   const initialName = items.some((item) => item.name === selectedName)
     ? selectedName
     : items[0].name;
-  transcriptSelect.value = initialName;
-  await loadTranscript(initialName);
+  lessonSelect.value = initialName;
+  await loadLesson(initialName);
 }
 
 loadButton.addEventListener("click", async () => {
-  if (!transcriptSelect.value) return;
-  await loadTranscript(transcriptSelect.value);
+  if (!lessonSelect.value) return;
+  await loadLesson(lessonSelect.value);
 });
 
 tableBody.addEventListener("click", async (event) => {
@@ -186,6 +186,6 @@ audioPlayer.addEventListener("pause", () => {
   currentStopAt = null;
 });
 
-loadTranscriptList().catch(() => {
+loadLessonList().catch(() => {
   tableBody.innerHTML = `<tr><td colspan="7" class="empty-row">初期化に失敗しました。</td></tr>`;
 });

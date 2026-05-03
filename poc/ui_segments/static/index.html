@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Segment Review UI</title>
-    <link rel="stylesheet" href="/segment-static/styles.css?v=1" />
+    <link rel="stylesheet" href="/segment-static/styles.css?v=2" />
   </head>
   <body>
     <main class="page">
@@ -13,13 +13,13 @@
           <p class="eyebrow">PoC UI</p>
           <h1>Segment Review</h1>
           <p class="hero-copy">
-            segment ごとの音声をすぐ再生して、文字起こしが合っているか確認するための最小 UI。
+            `poc/output/&lt;lesson&gt;/merged.diarized.transcript.json` を読み、segment ごとの音声をすぐ再生して確認するための最小 UI。
           </p>
         </div>
         <div class="picker">
-          <label for="transcript-select">Transcript</label>
+          <label for="lesson-select">Lesson</label>
           <div class="picker-row">
-            <select id="transcript-select"></select>
+            <select id="lesson-select"></select>
             <button id="load-button" type="button">Load</button>
           </div>
         </div>
@@ -59,13 +59,13 @@
           </thead>
           <tbody id="segment-table-body">
             <tr>
-              <td colspan="7" class="empty-row">Transcript を選んでください。</td>
+              <td colspan="7" class="empty-row">Lesson を選んでください。</td>
             </tr>
           </tbody>
         </table>
       </section>
     </main>
 
-    <script src="/segment-static/app.js?v=1" defer></script>
+    <script src="/segment-static/app.js?v=2" defer></script>
   </body>
 </html>
