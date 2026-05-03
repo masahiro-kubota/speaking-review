@@ -1,11 +1,11 @@
-# Transcript Review UI
+# Segment Review UI
 
 segment ごとの音声を再生しながら、文字起こしを確認するための最小 UI です。
 
 ## 起動
 
 ```bash
-uv run uvicorn app:app --app-dir poc/ui --reload
+uv run uvicorn app:app --app-dir poc/ui_segments --reload
 ```
 
 ブラウザで `http://127.0.0.1:8000` を開きます。

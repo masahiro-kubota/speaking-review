@@ -15,8 +15,8 @@ TRANSCRIPT_SUFFIX = ".diarized.transcript.json"
 SPEAKER_ROLES_SUFFIX = ".speaker_roles.json"
 
 
-app = FastAPI(title="Transcript Review UI")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app = FastAPI(title="Segment Review UI")
+app.mount("/segment-static", StaticFiles(directory=STATIC_DIR), name="segment-static")
 
 
 def available_transcript_paths() -> list[Path]:
