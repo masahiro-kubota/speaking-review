@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Student Speech Review UI</title>
-    <link rel="stylesheet" href="/student-turn-static/styles.css?v=6" />
+    <link rel="stylesheet" href="/student-turn-static/styles.css?v=8" />
   </head>
   <body>
     <main class="page">
@@ -13,17 +13,10 @@
           <p class="eyebrow">PoC UI</p>
           <h1>Student Speech Review</h1>
           <p class="hero-copy">
-            `poc/output/&lt;lesson&gt;/merged.student_turns.json` と `merged.student_utterances.json` を見ながら、utterance 単位の添削結果を確認するための最小 UI。
+            `poc/output/&lt;lesson&gt;/merged.student_exchanges.json` を見ながら、teacher prompt と student response の exchange 単位で添削結果を確認するための最小 UI。
           </p>
         </div>
         <div class="picker">
-          <label for="unit-select">Unit</label>
-          <div class="picker-row single-row">
-            <select id="unit-select">
-              <option value="turn">Turn</option>
-              <option value="utterance">Utterance</option>
-            </select>
-          </div>
           <label for="lesson-select">Lesson</label>
           <div class="picker-row">
             <select id="lesson-select"></select>
@@ -38,7 +31,7 @@
           <strong id="audio-file-name">-</strong>
         </div>
         <div class="meta-card">
-          <span class="meta-label" id="item-count-label">Turns</span>
+          <span class="meta-label" id="item-count-label">Exchanges</span>
           <strong id="item-count">0</strong>
         </div>
         <div class="meta-card">
@@ -64,6 +57,6 @@
       </section>
     </main>
 
-    <script src="/student-turn-static/app.js?v=6" defer></script>
+    <script src="/student-turn-static/app.js?v=8" defer></script>
   </body>
 </html>

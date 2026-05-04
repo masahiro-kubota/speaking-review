@@ -6,21 +6,19 @@
 
 `poc/extract_student_turns.py` は、diarized transcript JSON と `speaker_roles.json` を入力にして、生徒側の発話だけを turn 単位にまとめた JSON を出力する簡易スクリプトです。
 
-`poc/group_student_utterances.py` は、`student_turns.json` を入力にして、曖昧な境界だけを OpenAI API で判定しながら、生徒発話をより大きい utterance 単位に再グルーピングする簡易スクリプトです。
+`poc/group_student_exchanges.py` は、`student_turns.json` を入力にして、曖昧な境界だけを OpenAI API で判定しながら、先生の prompt と生徒の response からなる exchange 単位に再グルーピングする簡易スクリプトです。
 
-`poc/review_student_utterances.py` は、`student_utterances.json` を入力にして、生徒発話 utterance ごとの添削結果を OpenAI API で生成する簡易スクリプトです。
+`poc/review_student_exchanges.py` は、`student_exchanges.json` を入力にして、生徒 response exchange ごとの添削結果を OpenAI API で生成する簡易スクリプトです。
 
 `poc/split_mp3_with_overlap.py` は、1 本の mp3 を重なりありで複数 part に分割し、後段の diarize / merge 用 manifest を出力する簡易スクリプトです。
 
 `poc/merge_diarized_transcripts.py` は、重なりありで diarize した 2 本の `*.diarized.transcript.json` を、manifest の時刻情報も使いながら 1 本の diarized transcript に結合する簡易スクリプトです。
 
-`poc/diarize_split_manifest_and_merge.py` は、1 本の mp3 に対して `split -> diarize -> pairwise merge` を一発で回す orchestrator です。
-
-`poc/build_lesson_review_bundle.py` は、1 本の mp3 に対して `split -> diarize -> pairwise merge -> speaker role inference -> student turn extraction -> utterance grouping -> utterance review` を一発で回す top-level orchestrator です。
+`poc/build_lesson_review_bundle.py` は、1 本の mp3 に対して `split -> diarize -> pairwise merge -> speaker role inference -> student turn extraction -> exchange grouping -> exchange review` を一発で回す top-level orchestrator です。
 
 `poc/ui_segments` には、diarized transcript を見ながら segment 区間を再生して確認するための最小 UI があります。
 
-`poc/ui_student_turns` には、`student_turns.json` / `student_utterances.json` を見ながら生徒発話の turn / utterance 単位で prompt と返答を確認するための最小 UI があります。
+`poc/ui_student_turns` には、`student_turns.json` / `student_exchanges.json` を見ながら生徒発話の turn / exchange 単位で prompt と返答を確認するための最小 UI があります。
 
 `poc/unused` には、現在のフローでは使っていない旧 PoC スクリプトを置いてあります。
 
@@ -28,11 +26,9 @@
 
 ### 1. 長い音声を重なりありで分割して diarize したい場合
 
-最短は `diarize_split_manifest_and_merge.py` を使うことです。
+最短は `build_lesson_review_bundle.py` を使うことです。
 
-1. `diarize_split_manifest_and_merge.py` で `split -> diarize -> pairwise merge` を一発で回す
-
-内部では次を順番に実行します。
+内部ではまず次を順番に実行します。
 
 1. `split_mp3_with_overlap.py` で mp3 を重なりありで分割して `split_manifest.json` を作る
 2. 各 `partXofY.mp3` を `transcribe_mp3_gpt4o_diarize.py` で diarize する
@@ -46,25 +42,25 @@
 
 ### 2. 生徒の speaking 添削まで進めたい場合
 
-最短は `build_lesson_review_bundle.py` を使うことです。
+最短は同じく `build_lesson_review_bundle.py` を使うことです。
 
 1. diarized transcript を用意する
 2. `infer_student_speaker.py` で raw speaker を `student / teacher` に推定する
 3. `extract_student_turns.py` で生徒発話を `turn` 単位に抽出する
-4. `group_student_utterances.py` でより大きい `utterance` 単位にまとめる
-5. `review_student_utterances.py` で utterance ごとの添削を作る
+4. `group_student_exchanges.py` で teacher prompt / student response の `exchange` 単位にまとめる
+5. `review_student_exchanges.py` で exchange ごとの添削を作る
 6. `ui_segments` / `ui_student_turns` で結果を確認する
 
 最終的に欲しいもの:
 - `*.speaker_roles.json`
 - `*.student_turns.json`
-- `*.student_utterances.json`
-- `*.student_utterance_reviews.json`
+- `*.student_exchanges.json`
+- `*.student_exchange_reviews.json`
 
 ### 用語
 
 - `turn`: raw diarization segment を軽くまとめた中間単位
-- `utterance`: 複数 turn をまたいでもよい、より意味まとまりに近い単位
+- `exchange`: 1 つの teacher prompt と、それに対する student response をまとめた最終レビュー単位
 
 ## 一発実行
 
@@ -76,7 +72,7 @@ uv run python poc/build_lesson_review_bundle.py \
   --reuse-merge false \
   --reuse-speaker-roles false \
   --reuse-turns false \
-  --reuse-utterances false \
+  --reuse-exchanges false \
   --reuse-reviews false
 ```
 
@@ -89,30 +85,8 @@ uv run python poc/build_lesson_review_bundle.py \
 - `--reuse-merge true|false`
 - `--reuse-speaker-roles true|false`
 - `--reuse-turns true|false`
-- `--reuse-utterances true|false`
+- `--reuse-exchanges true|false`
 - `--reuse-reviews true|false`
-
-デフォルトはすべて `false` です。
-
-`true` の場合は、そのフェーズで必要な成果物がすべて既に存在している必要があります。不足がある場合は自動補完せずエラーで止まります。
-
-## split -> diarize -> merge だけ一発実行
-
-```bash
-uv run python poc/diarize_split_manifest_and_merge.py \
-  "data/2026年5月02日 12_30のレッスン.mp3" \
-  --reuse-split false \
-  --reuse-diarize false \
-  --reuse-merge false
-```
-
-出力先はデフォルトで `poc/output/<original mp3 file stem>/` です。
-
-`reuse` はフェーズごとに明示指定します。
-
-- `--reuse-split true|false`
-- `--reuse-diarize true|false`
-- `--reuse-merge true|false`
 
 デフォルトはすべて `false` です。
 
@@ -147,23 +121,23 @@ uv run python poc/extract_student_turns.py \
 
 出力先はデフォルトで `poc/output/*.student_turns.json` です。
 
-## 生徒発話 utterance への再グルーピング
+## 生徒発話 exchange への再グルーピング
 
 ```bash
-uv run python poc/group_student_utterances.py \
+uv run python poc/group_student_exchanges.py \
   "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_turns.json"
 ```
 
-出力先はデフォルトで `poc/output/*.student_utterances.json` です。
+出力先はデフォルトで `poc/output/*.student_exchanges.json` です。
 
-## 生徒発話 utterance ごとの添削
+## 生徒発話 exchange ごとの添削
 
 ```bash
-uv run python poc/review_student_utterances.py \
-  "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_utterances.json"
+uv run python poc/review_student_exchanges.py \
+  "poc/output/2026年5月02日 12_30のレッスン.part1of2.student_exchanges.json"
 ```
 
-出力先はデフォルトで `poc/output/*.student_utterance_reviews.json` です。
+出力先はデフォルトで `poc/output/*.student_exchange_reviews.json` です。
 
 ## 重なりあり mp3 分割
 
@@ -203,4 +177,4 @@ uv run uvicorn app:app --app-dir poc/ui_student_turns --reload
 
 ## 旧 PoC
 
-旧来の `merge_transcripts.py`、`transcribe_mp3_gpt4o.py`、`review_student_turns.py` は、現在は `poc/unused/` に退避しています。
+旧来の `merge_transcripts.py`、`transcribe_mp3_gpt4o.py`、`review_student_turns.py`、`diarize_split_manifest_and_merge.py` は、現在は `poc/unused/` に退避しています。

@@ -7,8 +7,9 @@ A "turn" in this PoC means:
     - substantive teacher speech creates a boundary
 
 This is still a rough intermediate unit, not the final review unit.
-Later, `group_student_utterances.py` can merge multiple student turns into a
-larger "utterance" when they are semantically part of the same answer.
+Later, `group_student_exchanges.py` can merge multiple student turns into a
+larger "exchange" when they are semantically part of the same answer to the
+same teacher prompt.
 
 Example:
     uv run python poc/extract_student_turns.py \

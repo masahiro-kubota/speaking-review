@@ -11,63 +11,42 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = ROOT_DIR / "poc" / "output"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-STUDENT_TURNS_FILE_NAME = "merged.student_turns.json"
-STUDENT_UTTERANCES_FILE_NAME = "merged.student_utterances.json"
-STUDENT_UTTERANCE_REVIEWS_FILE_NAME = "merged.student_utterance_reviews.json"
+STUDENT_EXCHANGES_FILE_NAME = "merged.student_exchanges.json"
+STUDENT_EXCHANGE_REVIEWS_FILE_NAME = "merged.student_exchange_reviews.json"
 
 
 app = FastAPI(title="Student Speech Review UI")
 app.mount("/student-turn-static", StaticFiles(directory=STATIC_DIR), name="student-turn-static")
 
-
-def normalize_unit(unit: str) -> str:
-    if unit not in {"turn", "utterance"}:
-        raise HTTPException(status_code=400, detail="Invalid unit type.")
-    return unit
-
-
-def payload_file_name(unit: str) -> str:
-    unit = normalize_unit(unit)
-    return STUDENT_TURNS_FILE_NAME if unit == "turn" else STUDENT_UTTERANCES_FILE_NAME
-
-
-def review_file_name(unit: str) -> str | None:
-    unit = normalize_unit(unit)
-    return None if unit == "turn" else STUDENT_UTTERANCE_REVIEWS_FILE_NAME
-
-
-def available_lesson_dirs(unit: str) -> list[Path]:
-    unit = normalize_unit(unit)
+def available_lesson_dirs() -> list[Path]:
     if not OUTPUT_DIR.exists():
         return []
-    target_file_name = payload_file_name(unit)
     return sorted(
         [
             path
             for path in OUTPUT_DIR.iterdir()
-            if path.is_dir() and (path / target_file_name).is_file()
+            if path.is_dir() and (path / STUDENT_EXCHANGES_FILE_NAME).is_file()
         ],
-        key=lambda path: (path / target_file_name).stat().st_mtime,
+        key=lambda path: (path / STUDENT_EXCHANGES_FILE_NAME).stat().st_mtime,
         reverse=True,
     )
 
 
-def lesson_dir_from_name(name: str, unit: str) -> Path:
-    unit = normalize_unit(unit)
+def lesson_dir_from_name(name: str) -> Path:
     path = (OUTPUT_DIR / name).resolve()
     if path.parent != OUTPUT_DIR.resolve():
         raise HTTPException(status_code=400, detail="Invalid lesson path.")
     if not path.is_dir():
         raise HTTPException(status_code=404, detail="Lesson directory not found.")
-    if not (path / payload_file_name(unit)).is_file():
-        raise HTTPException(status_code=404, detail="Student-speech file not found.")
+    if not (path / STUDENT_EXCHANGES_FILE_NAME).is_file():
+        raise HTTPException(status_code=404, detail="Student exchange file not found.")
     return path
 
 
-def payload_path_for_lesson(lesson_dir: Path, unit: str) -> Path:
-    payload_path = lesson_dir / payload_file_name(unit)
+def payload_path_for_lesson(lesson_dir: Path) -> Path:
+    payload_path = lesson_dir / STUDENT_EXCHANGES_FILE_NAME
     if not payload_path.is_file():
-        raise HTTPException(status_code=404, detail="Student-speech file not found.")
+        raise HTTPException(status_code=404, detail="Student exchange file not found.")
     return payload_path
 
 
@@ -75,27 +54,8 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def review_path_for_lesson(lesson_dir: Path, unit: str) -> Path:
-    review_name = review_file_name(unit)
-    if review_name is None:
-        raise HTTPException(status_code=404, detail="Review file is not supported for this unit.")
-    return lesson_dir / review_name
-
-
-def load_reviews(lesson_dir: Path, unit: str) -> tuple[dict[str, dict], dict]:
-    unit = normalize_unit(unit)
-    review_name = review_file_name(unit)
-    if review_name is None:
-        return {}, {
-            "available": False,
-            "review_file_name": None,
-            "reviewed_count": 0,
-            "skipped_count": 0,
-            "error_count": 0,
-            "processed_count": 0,
-        }
-
-    review_path = lesson_dir / review_name
+def load_reviews(lesson_dir: Path) -> tuple[dict[str, dict], dict]:
+    review_path = lesson_dir / STUDENT_EXCHANGE_REVIEWS_FILE_NAME
     if not review_path.exists():
         return {}, {
             "available": False,
@@ -119,9 +79,8 @@ def load_reviews(lesson_dir: Path, unit: str) -> tuple[dict[str, dict], dict]:
         }
 
     review_map: dict[str, dict] = {}
-    item_id_key = "turn_id" if unit == "turn" else "utterance_id"
     for review in reviews:
-        item_id = str(review.get(item_id_key, "")).strip()
+        item_id = str(review.get("exchange_id", "")).strip()
         if item_id:
             review_map[item_id] = review
 
@@ -133,7 +92,7 @@ def load_reviews(lesson_dir: Path, unit: str) -> tuple[dict[str, dict], dict]:
         "error_count": int(payload.get("error_count", 0) or 0),
         "processed_count": int(
             payload.get(
-                "processed_utterance_count",
+                "processed_exchange_count",
                 payload.get("processed_turn_count", len(review_map)),
             )
             or 0
@@ -160,40 +119,38 @@ def resolve_audio_source(payload: dict) -> Path:
     raise HTTPException(status_code=404, detail="Audio file not found.")
 
 
-def normalize_items(payload: dict, review_map: dict[str, dict], unit: str) -> list[dict]:
-    unit = normalize_unit(unit)
-    key = "turns" if unit == "turn" else "utterances"
-    raw_items = payload.get(key)
+def normalize_items(payload: dict, review_map: dict[str, dict]) -> list[dict]:
+    raw_items = payload.get("exchanges")
     if not isinstance(raw_items, list):
         return []
 
     items: list[dict] = []
-    id_key = "turn_id" if unit == "turn" else "utterance_id"
-    id_prefix = "student_turn" if unit == "turn" else "student_utterance"
-
     for index, item in enumerate(raw_items, start=1):
-        item_id = str(item.get(id_key, "")).strip() or f"{id_prefix}_{index:03d}"
+        item_id = str(item.get("exchange_id", "")).strip() or f"student_exchange_{index:03d}"
         start = round(float(item.get("start", 0)), 3)
         end = round(float(item.get("end", 0)), 3)
         duration_seconds = round(float(item.get("duration_seconds", max(0.0, end - start))), 3)
         review = review_map.get(item_id, {})
 
-        prompt_start = item.get("prev_teacher_start")
-        prompt_end = item.get("prev_teacher_end")
+        prompt_text = str(item.get("teacher_prompt_text", "")).strip()
+        prompt_start = item.get("teacher_prompt_start")
+        prompt_end = item.get("teacher_prompt_end")
+        student_text = str(item.get("student_response_text", "")).strip()
+
         items.append(
             {
                 "id": item_id,
-                "unit_type": unit,
+                "unit_type": "exchange",
                 "speaker_labels": [str(label).strip() for label in item.get("speaker_labels", []) if str(label).strip()],
                 "start": start,
                 "end": end,
                 "duration_seconds": duration_seconds,
-                "text": str(item.get("text", "")).strip(),
-                "prev_teacher_text": str(item.get("prev_teacher_text", "")).strip(),
-                "prev_teacher_start": round(float(prompt_start), 3) if prompt_start is not None else None,
-                "prev_teacher_end": round(float(prompt_end), 3) if prompt_end is not None else None,
+                "student_text": student_text,
+                "prompt_text": prompt_text,
+                "prompt_start": round(float(prompt_start), 3) if prompt_start is not None else None,
+                "prompt_end": round(float(prompt_end), 3) if prompt_end is not None else None,
                 "source_unit_count": int(item.get("source_turn_count", 1) or 1),
-                "source_turn_ids": item.get("turn_ids", [item_id]) if unit == "utterance" else [item_id],
+                "source_turn_ids": item.get("turn_ids", [item_id]),
                 "review_status": str(review.get("review_status", "")).strip() or "not_reviewed",
                 "skip_reason": review.get("skip_reason"),
                 "error": review.get("error"),
@@ -207,26 +164,22 @@ def normalize_items(payload: dict, review_map: dict[str, dict], unit: str) -> li
     return items
 
 
-def build_payload(lesson_dir: Path, unit: str) -> dict:
-    unit = normalize_unit(unit)
-    payload_path = payload_path_for_lesson(lesson_dir, unit)
+def build_payload(lesson_dir: Path) -> dict:
+    payload_path = payload_path_for_lesson(lesson_dir)
     payload = load_json(payload_path)
     audio_path = resolve_audio_source(payload)
-    review_map, review_summary = load_reviews(lesson_dir, unit)
-    items = normalize_items(payload, review_map, unit)
-    item_label = "turn" if unit == "turn" else "utterance"
-    count_key = "turn_count" if unit == "turn" else "utterance_count"
+    review_map, review_summary = load_reviews(lesson_dir)
+    items = normalize_items(payload, review_map)
     return {
         "name": lesson_dir.name,
-        "unit_type": unit,
-        "unit_label": item_label,
+        "unit_type": "exchange",
+        "unit_label": "exchange",
         "payload_file_name": payload_path.name,
         "source_file": str(audio_path),
         "source_file_name": audio_path.name,
-        "merge_gap_seconds": payload.get("merge_gap_seconds"),
         "student_speakers": payload.get("student_speakers", []),
         "teacher_speakers": payload.get("teacher_speakers", []),
-        count_key: len(items),
+        "exchange_count": len(items),
         "item_count": len(items),
         "duration_seconds": max((item["end"] for item in items), default=0),
         "review_summary": review_summary,
@@ -234,12 +187,11 @@ def build_payload(lesson_dir: Path, unit: str) -> dict:
     }
 
 
-def build_summary(lesson_dir: Path, unit: str) -> dict:
-    unit = normalize_unit(unit)
-    payload = build_payload(lesson_dir, unit)
+def build_summary(lesson_dir: Path) -> dict:
+    payload = build_payload(lesson_dir)
     return {
         "name": payload["name"],
-        "unit_type": unit,
+        "unit_type": "exchange",
         "source_file_name": payload["source_file_name"],
         "item_count": payload["item_count"],
         "duration_seconds": payload["duration_seconds"],
@@ -252,17 +204,17 @@ def index() -> FileResponse:
 
 
 @app.get("/api/lessons")
-def list_lessons(unit: str = "turn") -> dict:
-    return {"items": [build_summary(path, unit) for path in available_lesson_dirs(unit)]}
+def list_lessons() -> dict:
+    return {"items": [build_summary(path) for path in available_lesson_dirs()]}
 
 
 @app.get("/api/student-speech")
-def get_student_speech(lesson: str, unit: str = "turn") -> dict:
-    return build_payload(lesson_dir_from_name(lesson, unit), unit)
+def get_student_speech(lesson: str) -> dict:
+    return build_payload(lesson_dir_from_name(lesson))
 
 
 @app.get("/api/audio")
-def get_audio(lesson: str, unit: str = "turn") -> FileResponse:
-    payload_path = payload_path_for_lesson(lesson_dir_from_name(lesson, unit), unit)
+def get_audio(lesson: str) -> FileResponse:
+    payload_path = payload_path_for_lesson(lesson_dir_from_name(lesson))
     payload = load_json(payload_path)
     return FileResponse(resolve_audio_source(payload))
