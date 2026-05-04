@@ -1,11 +1,11 @@
 
 <h1 align="center">Speaking Review Tools</h1>
 
+This tool is designed for English learners, especially those using DMM Eikaiwa. It transcribes the recording data available on your portal page and helps improve your utterances.
+
 <p align="center">
   <img src="images/image.png" alt="Speaking Review Tools UI" width="560" />
 </p>
-
-This tool is designed for English learners, especially those using DMM Eikaiwa. It transcribes the recording data available on your portal page and helps improve your utterances.
 
 ## How to Use
 
