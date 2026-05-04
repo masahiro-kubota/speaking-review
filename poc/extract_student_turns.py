@@ -4,6 +4,7 @@
 A "turn" in this PoC means:
     - a student-side chunk after raw diarization segments have been lightly merged
     - teacher backchannels such as short "mm-hmm" style acknowledgments are ignored
+    - ultra-short teacher fragments inside a continuing student answer are ignored
     - substantive teacher speech creates a boundary
 
 This is still a rough intermediate unit, not the final review unit.
@@ -29,6 +30,8 @@ from pathlib import Path
 DEFAULT_MERGE_GAP_SECONDS = 1.5
 MAX_BACKCHANNEL_DURATION_SECONDS = 1.2
 MAX_BACKCHANNEL_WORDS = 3
+MAX_TEACHER_FRAGMENT_DURATION_SECONDS = 0.35
+MAX_TEACHER_FRAGMENT_WORDS = 1
 TEACHER_BACKCHANNEL_KEYS = {
     "ah",
     "gotit",
@@ -194,6 +197,16 @@ def is_teacher_backchannel(turn: dict) -> bool:
     return normalize_text_key(turn["text"]) in TEACHER_BACKCHANNEL_KEYS
 
 
+def is_teacher_fragment(turn: dict) -> bool:
+    if turn["role"] != "teacher":
+        return False
+    if turn["duration_seconds"] > MAX_TEACHER_FRAGMENT_DURATION_SECONDS:
+        return False
+    if word_count(turn["text"]) > MAX_TEACHER_FRAGMENT_WORDS:
+        return False
+    return True
+
+
 def build_student_turn(
     turn_id: str,
     student_turn: dict,
@@ -270,12 +283,19 @@ def build_student_turns(role_turns: list[dict]) -> list[dict]:
     student_turns: list[dict] = []
     previous_teacher_turn: dict | None = None
     current_student_turn: dict | None = None
-    pending_backchannel = False
+    pending_ignorable_teacher = False
 
-    for turn in role_turns:
+    for index, turn in enumerate(role_turns):
+        next_turn = role_turns[index + 1] if index + 1 < len(role_turns) else None
+
         if turn["role"] == "teacher":
-            if is_teacher_backchannel(turn) and current_student_turn is not None:
-                pending_backchannel = True
+            if (
+                current_student_turn is not None
+                and next_turn is not None
+                and next_turn["role"] == "student"
+                and (is_teacher_backchannel(turn) or is_teacher_fragment(turn))
+            ):
+                pending_ignorable_teacher = True
                 continue
 
             if current_student_turn is not None:
@@ -284,7 +304,7 @@ def build_student_turns(role_turns: list[dict]) -> list[dict]:
                     build_student_turn(turn_id, current_student_turn, previous_teacher_turn)
                 )
                 current_student_turn = None
-                pending_backchannel = False
+                pending_ignorable_teacher = False
 
             previous_teacher_turn = turn
             continue
@@ -299,10 +319,10 @@ def build_student_turns(role_turns: list[dict]) -> list[dict]:
                 "raw_segment_ids": list(turn["raw_segment_ids"]),
                 "text": turn["text"],
             }
-            pending_backchannel = False
+            pending_ignorable_teacher = False
             continue
 
-        if not pending_backchannel:
+        if not pending_ignorable_teacher:
             turn_id = f"student_turn_{len(student_turns) + 1:03d}"
             student_turns.append(
                 build_student_turn(turn_id, current_student_turn, previous_teacher_turn)
@@ -329,7 +349,7 @@ def build_student_turns(role_turns: list[dict]) -> list[dict]:
                 current_student_turn["speaker_labels"].append(speaker_label)
         current_student_turn["segment_ids"].extend(turn["segment_ids"])
         current_student_turn["raw_segment_ids"].extend(turn["raw_segment_ids"])
-        pending_backchannel = False
+        pending_ignorable_teacher = False
 
     if current_student_turn is not None:
         turn_id = f"student_turn_{len(student_turns) + 1:03d}"
